@@ -1,3 +1,3 @@
 # othello
 
-An othello library for Rust.
+An Othello library for Rust.

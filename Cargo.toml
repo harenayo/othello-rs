@@ -1,4 +1,4 @@
 [package]
-name = "othello-rs"
+name = "othello"
 version = "0.0.0"
 edition = "2021"
