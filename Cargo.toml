@@ -1,4 +1,9 @@
 [package]
 name = "othello"
-version = "0.0.0"
+version = "0.1.0"
+authors = ["Harenayo"]
 edition = "2021"
+description = "A crate for Othello"
+readme = "README.md"
+repository = "https://github.com/harenayo/othello-rs"
+license = "MIT"
