@@ -2,7 +2,7 @@
 
 #![no_std]
 
-/// A position of a board.
+/// A position on a board.
 ///
 /// ```txt
 ///                       column
@@ -27,37 +27,37 @@
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Position {
-    value: u8,
+    raw: u8,
 }
 
 impl Position {
-    /// Gets a position.
+    /// Gets a position from a raw value.
     ///
     /// # Errors
-    /// This function will return an error if `value` is greater than `64`.
-    pub const fn of(value: u8) -> Result<Self, PositionOfError> {
-        match value < 64 {
-            true => Result::Ok(unsafe { Self::of_unchecked(value) }),
-            false => Result::Err(PositionOfError {
-                value,
+    /// This function will return an error if `raw` is greater than or equal to `64`.
+    pub const fn new(raw: u8) -> Result<Self, PositionNewError> {
+        match raw < 64 {
+            true => Result::Ok(unsafe { Self::new_unchecked(raw) }),
+            false => Result::Err(PositionNewError {
+                raw,
             }),
         }
     }
 
-    /// Gets a position.
+    /// Gets a position from a raw value.
     ///
     /// # Safety
-    /// `value` must be lesser than 64.
-    pub const unsafe fn of_unchecked(value: u8) -> Self {
+    /// `raw` must be lesser than 64.
+    pub const unsafe fn new_unchecked(raw: u8) -> Self {
         Self {
-            value,
+            raw,
         }
     }
 
-    /// Gets a position.
+    /// Gets a position from a row and a column.
     ///
     /// # Errors
-    /// This function will return an error if `row` or `column` is greater than `8`.
+    /// This function will return an error if `row` or `column` is greater than or equal to `8`.
     pub const fn at(row: u8, column: u8) -> Result<Self, PositionAtError> {
         match (row < 8, column < 8) {
             (true, true) => Result::Ok(unsafe { Self::at_unchecked(row, column) }),
@@ -68,39 +68,39 @@ impl Position {
         }
     }
 
-    /// Gets a position.
+    /// Gets a position from a row and a column.
     ///
     /// # Safety
     /// `row` and `column` must be lesser than 8.
     pub const unsafe fn at_unchecked(row: u8, column: u8) -> Self {
-        Self::of_unchecked(8 * row + column)
+        Self::new_unchecked(8 * row + column)
     }
 
     /// Gets a raw value.
-    pub const fn value(self) -> u8 {
-        self.value
+    pub const fn as_raw(self) -> u8 {
+        self.raw
     }
 
-    /// Calculates a row number.
+    /// Gets a row.
     pub const fn row(self) -> u8 {
-        self.value / 8
+        self.raw / 8
     }
 
-    /// Calculates a column number.
+    /// Gets a column.
     pub const fn column(self) -> u8 {
-        self.value % 8
+        self.raw % 8
     }
 
     /// Gets an iterator of all positions.
     pub fn iter() -> impl Iterator<Item = Self> {
-        (0..64).map(|position| unsafe { Self::of_unchecked(position) })
+        (0..64).map(|position| unsafe { Self::new_unchecked(position) })
     }
 }
 
-/// An error returned by [`Position::of`]
+/// An error returned by [`Position::new`]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct PositionOfError {
-    value: u8,
+pub struct PositionNewError {
+    raw: u8,
 }
 
 /// An error returned by [`Position::at`]
@@ -110,101 +110,163 @@ pub struct PositionAtError {
     column: u8,
 }
 
-/// 64-bit data of a board.
+/// 8x8 boolean values.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Bits {
-    value: u64,
+pub struct Bools {
+    raw: u64,
 }
 
-impl Bits {
-    const MASK_ALL_EDGES: Self = Self::and(Self::MASK_RIGHT_LEFT, Self::MASK_TOP_BOTTOM);
-    const MASK_RIGHT_LEFT: Self = Self::of(0)
-        .set(unsafe { Position::at_unchecked(0, 0) }, true)
-        .set(unsafe { Position::at_unchecked(0, 7) }, true)
-        .set(unsafe { Position::at_unchecked(1, 0) }, true)
-        .set(unsafe { Position::at_unchecked(1, 7) }, true)
-        .set(unsafe { Position::at_unchecked(2, 0) }, true)
-        .set(unsafe { Position::at_unchecked(2, 7) }, true)
-        .set(unsafe { Position::at_unchecked(3, 0) }, true)
-        .set(unsafe { Position::at_unchecked(3, 7) }, true)
+impl Bools {
+    const MASK1: Bools = Bools::repeat(false)
         .set(unsafe { Position::at_unchecked(4, 0) }, true)
-        .set(unsafe { Position::at_unchecked(4, 7) }, true)
+        .set(unsafe { Position::at_unchecked(4, 1) }, true)
+        .set(unsafe { Position::at_unchecked(4, 2) }, true)
+        .set(unsafe { Position::at_unchecked(4, 3) }, true)
         .set(unsafe { Position::at_unchecked(5, 0) }, true)
-        .set(unsafe { Position::at_unchecked(5, 7) }, true)
+        .set(unsafe { Position::at_unchecked(5, 1) }, true)
+        .set(unsafe { Position::at_unchecked(5, 2) }, true)
+        .set(unsafe { Position::at_unchecked(5, 3) }, true)
         .set(unsafe { Position::at_unchecked(6, 0) }, true)
-        .set(unsafe { Position::at_unchecked(6, 7) }, true)
-        .set(unsafe { Position::at_unchecked(7, 0) }, true)
-        .set(unsafe { Position::at_unchecked(7, 7) }, true)
-        .not();
-    const MASK_TOP_BOTTOM: Self = Self::of(0)
-        .set(unsafe { Position::at_unchecked(0, 0) }, true)
-        .set(unsafe { Position::at_unchecked(0, 1) }, true)
-        .set(unsafe { Position::at_unchecked(0, 2) }, true)
-        .set(unsafe { Position::at_unchecked(0, 3) }, true)
-        .set(unsafe { Position::at_unchecked(0, 4) }, true)
-        .set(unsafe { Position::at_unchecked(0, 5) }, true)
-        .set(unsafe { Position::at_unchecked(0, 6) }, true)
-        .set(unsafe { Position::at_unchecked(0, 7) }, true)
+        .set(unsafe { Position::at_unchecked(6, 1) }, true)
+        .set(unsafe { Position::at_unchecked(6, 2) }, true)
+        .set(unsafe { Position::at_unchecked(6, 3) }, true)
         .set(unsafe { Position::at_unchecked(7, 0) }, true)
         .set(unsafe { Position::at_unchecked(7, 1) }, true)
         .set(unsafe { Position::at_unchecked(7, 2) }, true)
-        .set(unsafe { Position::at_unchecked(7, 3) }, true)
+        .set(unsafe { Position::at_unchecked(7, 3) }, true);
+    const MASK2: Bools = Bools::repeat(false)
+        .set(unsafe { Position::at_unchecked(2, 0) }, true)
+        .set(unsafe { Position::at_unchecked(2, 1) }, true)
+        .set(unsafe { Position::at_unchecked(2, 4) }, true)
+        .set(unsafe { Position::at_unchecked(2, 5) }, true)
+        .set(unsafe { Position::at_unchecked(3, 0) }, true)
+        .set(unsafe { Position::at_unchecked(3, 1) }, true)
+        .set(unsafe { Position::at_unchecked(3, 4) }, true)
+        .set(unsafe { Position::at_unchecked(3, 5) }, true)
+        .set(unsafe { Position::at_unchecked(6, 0) }, true)
+        .set(unsafe { Position::at_unchecked(6, 1) }, true)
+        .set(unsafe { Position::at_unchecked(6, 4) }, true)
+        .set(unsafe { Position::at_unchecked(6, 5) }, true)
+        .set(unsafe { Position::at_unchecked(7, 0) }, true)
+        .set(unsafe { Position::at_unchecked(7, 1) }, true)
         .set(unsafe { Position::at_unchecked(7, 4) }, true)
-        .set(unsafe { Position::at_unchecked(7, 5) }, true)
-        .set(unsafe { Position::at_unchecked(7, 6) }, true)
-        .set(unsafe { Position::at_unchecked(7, 7) }, true)
-        .not();
+        .set(unsafe { Position::at_unchecked(7, 5) }, true);
+    const MASK3: Bools = Bools::repeat(false)
+        .set(unsafe { Position::at_unchecked(1, 0) }, true)
+        .set(unsafe { Position::at_unchecked(1, 2) }, true)
+        .set(unsafe { Position::at_unchecked(1, 4) }, true)
+        .set(unsafe { Position::at_unchecked(1, 6) }, true)
+        .set(unsafe { Position::at_unchecked(3, 0) }, true)
+        .set(unsafe { Position::at_unchecked(3, 2) }, true)
+        .set(unsafe { Position::at_unchecked(3, 4) }, true)
+        .set(unsafe { Position::at_unchecked(3, 6) }, true)
+        .set(unsafe { Position::at_unchecked(5, 0) }, true)
+        .set(unsafe { Position::at_unchecked(5, 2) }, true)
+        .set(unsafe { Position::at_unchecked(5, 4) }, true)
+        .set(unsafe { Position::at_unchecked(5, 6) }, true)
+        .set(unsafe { Position::at_unchecked(7, 0) }, true)
+        .set(unsafe { Position::at_unchecked(7, 2) }, true)
+        .set(unsafe { Position::at_unchecked(7, 4) }, true)
+        .set(unsafe { Position::at_unchecked(7, 6) }, true);
+    const MASK4: Self = Self::repeat(true)
+        .set(unsafe { Position::at_unchecked(0, 0) }, false)
+        .set(unsafe { Position::at_unchecked(0, 7) }, false)
+        .set(unsafe { Position::at_unchecked(1, 0) }, false)
+        .set(unsafe { Position::at_unchecked(1, 7) }, false)
+        .set(unsafe { Position::at_unchecked(2, 0) }, false)
+        .set(unsafe { Position::at_unchecked(2, 7) }, false)
+        .set(unsafe { Position::at_unchecked(3, 0) }, false)
+        .set(unsafe { Position::at_unchecked(3, 7) }, false)
+        .set(unsafe { Position::at_unchecked(4, 0) }, false)
+        .set(unsafe { Position::at_unchecked(4, 7) }, false)
+        .set(unsafe { Position::at_unchecked(5, 0) }, false)
+        .set(unsafe { Position::at_unchecked(5, 7) }, false)
+        .set(unsafe { Position::at_unchecked(6, 0) }, false)
+        .set(unsafe { Position::at_unchecked(6, 7) }, false)
+        .set(unsafe { Position::at_unchecked(7, 0) }, false)
+        .set(unsafe { Position::at_unchecked(7, 7) }, false);
+    const MASK5: Self = Self::repeat(true)
+        .set(unsafe { Position::at_unchecked(0, 0) }, false)
+        .set(unsafe { Position::at_unchecked(0, 1) }, false)
+        .set(unsafe { Position::at_unchecked(0, 2) }, false)
+        .set(unsafe { Position::at_unchecked(0, 3) }, false)
+        .set(unsafe { Position::at_unchecked(0, 4) }, false)
+        .set(unsafe { Position::at_unchecked(0, 5) }, false)
+        .set(unsafe { Position::at_unchecked(0, 6) }, false)
+        .set(unsafe { Position::at_unchecked(0, 7) }, false)
+        .set(unsafe { Position::at_unchecked(7, 0) }, false)
+        .set(unsafe { Position::at_unchecked(7, 1) }, false)
+        .set(unsafe { Position::at_unchecked(7, 2) }, false)
+        .set(unsafe { Position::at_unchecked(7, 3) }, false)
+        .set(unsafe { Position::at_unchecked(7, 4) }, false)
+        .set(unsafe { Position::at_unchecked(7, 5) }, false)
+        .set(unsafe { Position::at_unchecked(7, 6) }, false)
+        .set(unsafe { Position::at_unchecked(7, 7) }, false);
+    const MASK6: Self = Self::and(Self::MASK4, Self::MASK5);
 
-    /// Gets bits.
-    pub const fn of(value: u64) -> Self {
+    /// Gets boolean values from a raw value.
+    pub const fn new(raw: u64) -> Self {
         Self {
-            value,
+            raw,
+        }
+    }
+
+    /// Gets boolean values which are equal to the value.
+    pub const fn repeat(value: bool) -> Self {
+        match value {
+            false => Self::new(0),
+            true => Self::repeat(false).not(),
         }
     }
 
     /// Gets a raw value.
-    pub const fn value(self) -> u64 {
-        self.value
+    pub const fn as_raw(self) -> u64 {
+        self.raw
+    }
+
+    /// Tests if the values are equal.
+    pub const fn equal(self, other: Self) -> bool {
+        self.raw == other.raw
     }
 
     /// Calculates bitwise NOT.
     pub const fn not(self) -> Self {
-        Self::of(!self.value)
+        Self::new(!self.raw)
     }
 
     /// Calculates bitwise AND.
     pub const fn and(self, other: Self) -> Self {
-        Self::of(self.value & other.value)
+        Self::new(self.raw & other.raw)
     }
 
     /// Calculates bitwise OR.
     pub const fn or(self, other: Self) -> Self {
-        Self::of(self.value | other.value)
+        Self::new(self.raw | other.raw)
     }
 
     /// Calculates bitwise XOR.
     pub const fn xor(self, other: Self) -> Self {
-        Self::of(self.value ^ other.value)
+        Self::new(self.raw ^ other.raw)
     }
 
     /// Shifts the bits to the left.
     pub const fn shl(self, n: u8) -> Self {
-        Self::of(self.value << n)
+        Self::new(self.raw << n)
     }
 
     /// Shifts the bits to the right.
     pub const fn shr(self, n: u8) -> Self {
-        Self::of(self.value >> n)
+        Self::new(self.raw >> n)
     }
 
-    /// Gets a bit.
+    /// Gets a boolean value at the position.
     pub const fn get(self, position: Position) -> bool {
-        self.and(Self::of(0).set(position, true)).any()
+        !self.and(Self::repeat(false).set(position, true)).all(false)
     }
 
-    /// Sets a bit.
+    /// Sets a boolean value at the position.
     pub const fn set(self, position: Position, value: bool) -> Self {
-        let position = Self::of(1 << position.value());
+        let position = Self::new(1 << position.as_raw());
 
         match value {
             true => self.or(position),
@@ -212,65 +274,25 @@ impl Bits {
         }
     }
 
-    /// Moves a bit at (r, c) to (7 - r, c).
-    pub const fn flip_vertically(self) -> Self {
-        Self::of(self.value.swap_bytes())
+    pub const fn all(self, value: bool) -> bool {
+        self.equal(Self::repeat(value))
     }
 
-    /// Moves a bit at (r, c) to (c, r).
-    pub const fn flip_diagonally(self) -> Self {
-        const MASK1: Bits = Bits::of(0)
-            .set(unsafe { Position::at_unchecked(4, 0) }, true)
-            .set(unsafe { Position::at_unchecked(4, 1) }, true)
-            .set(unsafe { Position::at_unchecked(4, 2) }, true)
-            .set(unsafe { Position::at_unchecked(4, 3) }, true)
-            .set(unsafe { Position::at_unchecked(5, 0) }, true)
-            .set(unsafe { Position::at_unchecked(5, 1) }, true)
-            .set(unsafe { Position::at_unchecked(5, 2) }, true)
-            .set(unsafe { Position::at_unchecked(5, 3) }, true)
-            .set(unsafe { Position::at_unchecked(6, 0) }, true)
-            .set(unsafe { Position::at_unchecked(6, 1) }, true)
-            .set(unsafe { Position::at_unchecked(6, 2) }, true)
-            .set(unsafe { Position::at_unchecked(6, 3) }, true)
-            .set(unsafe { Position::at_unchecked(7, 0) }, true)
-            .set(unsafe { Position::at_unchecked(7, 1) }, true)
-            .set(unsafe { Position::at_unchecked(7, 2) }, true)
-            .set(unsafe { Position::at_unchecked(7, 3) }, true);
-        const MASK2: Bits = Bits::of(0)
-            .set(unsafe { Position::at_unchecked(2, 0) }, true)
-            .set(unsafe { Position::at_unchecked(2, 1) }, true)
-            .set(unsafe { Position::at_unchecked(2, 4) }, true)
-            .set(unsafe { Position::at_unchecked(2, 5) }, true)
-            .set(unsafe { Position::at_unchecked(3, 0) }, true)
-            .set(unsafe { Position::at_unchecked(3, 1) }, true)
-            .set(unsafe { Position::at_unchecked(3, 4) }, true)
-            .set(unsafe { Position::at_unchecked(3, 5) }, true)
-            .set(unsafe { Position::at_unchecked(6, 0) }, true)
-            .set(unsafe { Position::at_unchecked(6, 1) }, true)
-            .set(unsafe { Position::at_unchecked(6, 4) }, true)
-            .set(unsafe { Position::at_unchecked(6, 5) }, true)
-            .set(unsafe { Position::at_unchecked(7, 0) }, true)
-            .set(unsafe { Position::at_unchecked(7, 1) }, true)
-            .set(unsafe { Position::at_unchecked(7, 4) }, true)
-            .set(unsafe { Position::at_unchecked(7, 5) }, true);
-        const MASK3: Bits = Bits::of(0)
-            .set(unsafe { Position::at_unchecked(1, 0) }, true)
-            .set(unsafe { Position::at_unchecked(1, 2) }, true)
-            .set(unsafe { Position::at_unchecked(1, 4) }, true)
-            .set(unsafe { Position::at_unchecked(1, 6) }, true)
-            .set(unsafe { Position::at_unchecked(3, 0) }, true)
-            .set(unsafe { Position::at_unchecked(3, 2) }, true)
-            .set(unsafe { Position::at_unchecked(3, 4) }, true)
-            .set(unsafe { Position::at_unchecked(3, 6) }, true)
-            .set(unsafe { Position::at_unchecked(5, 0) }, true)
-            .set(unsafe { Position::at_unchecked(5, 2) }, true)
-            .set(unsafe { Position::at_unchecked(5, 4) }, true)
-            .set(unsafe { Position::at_unchecked(5, 6) }, true)
-            .set(unsafe { Position::at_unchecked(7, 0) }, true)
-            .set(unsafe { Position::at_unchecked(7, 2) }, true)
-            .set(unsafe { Position::at_unchecked(7, 4) }, true)
-            .set(unsafe { Position::at_unchecked(7, 6) }, true);
+    /// Counts boolean values which are equal to the argument.
+    pub const fn count(self, value: bool) -> u32 {
+        match value {
+            true => self.raw.count_ones(),
+            false => self.raw.count_zeros(),
+        }
+    }
 
+    /// Moves boolean values at `(r, c)` to `(7 - r, c)`.
+    pub const fn flip_vertically(self) -> Self {
+        Self::new(self.raw.swap_bytes())
+    }
+
+    /// Moves boolean values at `(r, c)` to `(c, r)`.
+    pub const fn flip_diagonally(self) -> Self {
         macro_rules! calc {
             ($bits:expr, $mask:expr, $n:expr) => {{
                 let mask = $mask.and($bits.xor($bits.shl($n)));
@@ -279,18 +301,18 @@ impl Bits {
         }
 
         let mut result = self;
-        result = result.xor(calc!(result, MASK1, 28));
-        result = result.xor(calc!(result, MASK2, 14));
-        result = result.xor(calc!(result, MASK3, 7));
+        result = result.xor(calc!(result, Self::MASK1, 28));
+        result = result.xor(calc!(result, Self::MASK2, 14));
+        result = result.xor(calc!(result, Self::MASK3, 7));
         result
     }
 
-    /// Moves a bit at (r, c) to (7 - r, 7 - c).
+    /// Moves boolean values at `(r, c)` to `(7 - r, 7 - c)`.
     pub const fn rotate(self) -> Self {
-        Self::of(self.value.reverse_bits())
+        Self::new(self.raw.reverse_bits())
     }
 
-    /// Calculates same bits without flipping and rotation.
+    /// Calculates equal values without flipping and rotation.
     pub const fn augment(self) -> [Self; 8] {
         let mut result = [self; 8];
         result[4] = result[4].flip_diagonally();
@@ -308,20 +330,7 @@ impl Bits {
         result
     }
 
-    /// Tests if any bit is true.
-    pub const fn any(self) -> bool {
-        self.value != 0
-    }
-
-    /// Counts bits which are equal to the argument.
-    pub const fn count(self, value: bool) -> u32 {
-        match value {
-            true => self.value.count_ones(),
-            false => self.value.count_zeros(),
-        }
-    }
-
-    /// Gets positions where the bit is equal to the argument.
+    /// Gets positions where the boolean value is equal to the argument.
     pub fn positions(self, value: bool) -> impl Iterator<Item = Position> {
         match value {
             true => Position::iter().filter(move |position| self.get(*position)),
@@ -331,27 +340,26 @@ impl Bits {
 }
 
 macro_rules! line {
-    ($bits:expr, $mask:expr, $shift:ident, $n:expr) => {{
-        let mut result = $bits.$shift($n).and($mask);
-        result = result.$shift($n).and($mask).or(result);
-        result = result.$shift($n).and($mask).or(result);
-        result = result.$shift($n).and($mask).or(result);
-        result = result.$shift($n).and($mask).or(result);
-        result = result.$shift($n).and($mask).or(result);
-        result
+    ($start:expr, $area:expr, $shift:ident, $n:expr) => {{
+        let mut result = $start.$shift($n).and($area);
+        result = result.$shift($n).and($area).or(result);
+        result = result.$shift($n).and($area).or(result);
+        result = result.$shift($n).and($area).or(result);
+        result = result.$shift($n).and($area).or(result);
+        result.$shift($n).and($area).or(result)
     }};
 }
 
-/// The colors, black or white.
+/// A player.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Color {
+pub enum Player {
     Black,
     White,
 }
 
-impl Color {
-    /// Gets the another color.
-    pub const fn flip(self) -> Self {
+impl Player {
+    /// Gets the opponent.
+    pub const fn opponent(self) -> Self {
         match self {
             Self::Black => Self::White,
             Self::White => Self::Black,
@@ -359,38 +367,21 @@ impl Color {
     }
 }
 
-/// The result kind, win or lose.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum ResultKind {
-    Win,
-    Lose,
-}
-
-impl ResultKind {
-    /// Gets the another kind.
-    pub const fn flip(self) -> Self {
-        match self {
-            Self::Win => Self::Lose,
-            Self::Lose => Self::Win,
-        }
-    }
-}
-
 /// A board.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Board {
-    black: Bits,
-    white: Bits,
+    black: Bools,
+    white: Bools,
 }
 
 impl Board {
     /// The standard board.
     pub const STANDARD: Self = unsafe {
         Self::new_unchecked(
-            Bits::of(0)
+            Bools::repeat(false)
                 .set(Position::at_unchecked(3, 4), true)
                 .set(Position::at_unchecked(4, 3), true),
-            Bits::of(0)
+            Bools::repeat(false)
                 .set(Position::at_unchecked(3, 3), true)
                 .set(Position::at_unchecked(4, 4), true),
         )
@@ -399,11 +390,11 @@ impl Board {
     /// Gets a new board.
     ///
     /// Errors
-    /// This function will return an error if there is any position which the bit of `black` and the bit of `white` are true.
-    pub const fn new(black: Bits, white: Bits) -> Result<Self, BoardNewError> {
-        match Bits::and(black, white).value() {
-            0 => Result::Ok(unsafe { Self::new_unchecked(black, white) }),
-            _ => Result::Err(BoardNewError {
+    /// This function will return an error if there is any position which the boolean values of `black` and `white` are true.
+    pub const fn new(black: Bools, white: Bools) -> Result<Self, BoardNewError> {
+        match Bools::and(black, white).all(false) {
+            true => Result::Ok(unsafe { Self::new_unchecked(black, white) }),
+            false => Result::Err(BoardNewError {
                 black,
                 white,
             }),
@@ -413,103 +404,113 @@ impl Board {
     /// Gets a new board.
     ///
     /// # Safety
-    /// `black` and `white` must be exclusive, in the other words, `black` AND `white` must be `0`.
-    pub const unsafe fn new_unchecked(black: Bits, white: Bits) -> Self {
+    /// The all boolean values of `black` AND `white` must be false.
+    pub const unsafe fn new_unchecked(black: Bools, white: Bools) -> Self {
         Self {
             black,
             white,
         }
     }
 
+    /// Gets a board with black and white swaped.
+    pub const fn swap_disks(self) -> Self {
+        unsafe { Self::new_unchecked(self.white, self.black) }
+    }
+
     /// Gets disks.
-    pub const fn disks(self, color: Color) -> Bits {
-        match color {
-            Color::Black => self.black,
-            Color::White => self.white,
+    pub const fn disks(self, player: Player) -> Bools {
+        match player {
+            Player::Black => self.black,
+            Player::White => self.white,
         }
     }
 
-    /// Gets a color of a disk at `position`.
-    pub const fn get(self, position: Position) -> Option<Color> {
+    /// Gets a color of the disk at the position.
+    pub const fn get(self, position: Position) -> Option<Player> {
         if self.black.get(position) {
-            Option::Some(Color::Black)
+            Option::Some(Player::Black)
         } else if self.white.get(position) {
-            Option::Some(Color::White)
+            Option::Some(Player::White)
         } else {
             Option::None
         }
     }
 
     /// Calculates legal moves.
-    pub const fn legal_moves(self, color: Color) -> Bits {
-        macro_rules! calc {
-            ($player:expr, $opponent:expr, $mask:expr, $n:expr) => {{
-                let mask = $opponent.and($mask);
+    pub const fn legal_moves(self, player: Player) -> Bools {
+        match player {
+            Player::Black => {
+                macro_rules! calc {
+                    ($board:expr, $mask:expr, $n:expr) => {{
+                        let mask = $board.white.and($mask);
 
-                Bits::or(
-                    line!($player, mask, shl, $n).shl($n),
-                    line!($player, mask, shr, $n).shr($n),
-                )
-            }};
+                        Bools::or(
+                            line!($board.black, mask, shl, $n).shl($n),
+                            line!($board.black, mask, shr, $n).shr($n),
+                        )
+                    }};
+                }
+
+                Bools::repeat(false)
+                    .or(calc!(self, Bools::MASK4, 1))
+                    .or(calc!(self, Bools::MASK6, 7))
+                    .or(calc!(self, Bools::MASK5, 8))
+                    .or(calc!(self, Bools::MASK6, 9))
+                    .and(Bools::or(self.black, self.white).not())
+            },
+            Player::White => self.swap_disks().legal_moves(Player::Black),
         }
-
-        let player = self.disks(color);
-        let opponent = self.disks(color.flip());
-
-        Bits::of(0)
-            .or(calc!(player, opponent, Bits::MASK_RIGHT_LEFT, 1))
-            .or(calc!(player, opponent, Bits::MASK_ALL_EDGES, 7))
-            .or(calc!(player, opponent, Bits::MASK_TOP_BOTTOM, 8))
-            .or(calc!(player, opponent, Bits::MASK_ALL_EDGES, 9))
-            .and(Bits::or(player, opponent).not())
     }
 
     /// Calculates disks which will be reversed.
-    pub const fn reversed_disks(self, color: Color, position: Position) -> Bits {
-        macro_rules! calc {
-            ($player:expr, $opponent:expr, $position:expr, $mask:expr, $n:expr) => {{
-                let mask = $opponent.and($mask);
-                let mut result = Bits::of(0);
-                let line = line!($position, mask, shl, $n);
+    pub const fn reversed_disks(self, player: Player, position: Position) -> Bools {
+        match player {
+            Player::Black => {
+                macro_rules! calc {
+                    ($board:expr, $position:expr, $mask:expr, $n:expr) => {{
+                        let mask = $board.white.and($mask);
+                        let mut result = Bools::repeat(false);
+                        let line = line!($position, mask, shl, $n);
 
-                if $player.and(line.shl($n)).any() {
-                    result = result.or(line);
+                        if !$board.black.and(line.shl($n)).all(false) {
+                            result = result.or(line);
+                        }
+
+                        let line = line!($position, mask, shr, $n);
+
+                        if !$board.black.and(line.shr($n)).all(false) {
+                            result = result.or(line);
+                        }
+
+                        result
+                    }};
                 }
 
-                let line = line!($position, mask, shr, $n);
+                let position = Bools::repeat(false).set(position, true);
 
-                if $player.and(line.shr($n)).any() {
-                    result = result.or(line);
-                }
-
-                result
-            }};
+                Bools::repeat(false)
+                    .or(calc!(self, position, Bools::MASK4, 1))
+                    .or(calc!(self, position, Bools::MASK6, 7))
+                    .or(calc!(self, position, Bools::MASK5, 8))
+                    .or(calc!(self, position, Bools::MASK6, 9))
+            },
+            Player::White => self.swap_disks().reversed_disks(Player::Black, position),
         }
-
-        let player = self.disks(color);
-        let opponent = self.disks(color.flip());
-        let position = Bits::of(0).set(position, true);
-
-        Bits::of(0)
-            .or(calc!(player, opponent, position, Bits::MASK_RIGHT_LEFT, 1))
-            .or(calc!(player, opponent, position, Bits::MASK_ALL_EDGES, 7))
-            .or(calc!(player, opponent, position, Bits::MASK_TOP_BOTTOM, 8))
-            .or(calc!(player, opponent, position, Bits::MASK_ALL_EDGES, 9))
     }
 
     /// Makes a move.
     ///
     /// # Errors
-    /// This function will return an error if the move is not legal.
+    /// This function will return an error if the move is illegal.
     pub const fn make_move(
         self,
-        color: Color,
+        player: Player,
         position: Position,
     ) -> Result<Self, BoardMakeMoveError> {
-        match self.legal_moves(color).get(position) {
-            true => Result::Ok(unsafe { self.make_move_unchecked(color, position) }),
+        match self.legal_moves(player).get(position) {
+            true => Result::Ok(unsafe { self.make_move_unchecked(player, position) }),
             false => Result::Err(BoardMakeMoveError {
-                color,
+                color: player,
                 position,
             }),
         }
@@ -521,13 +522,13 @@ impl Board {
     /// This function will return an error if there is a disk at the position.
     pub const fn make_move_illegally(
         self,
-        color: Color,
+        player: Player,
         position: Position,
     ) -> Result<Self, BoardMakeMoveIllegallyError> {
         match self.get(position) {
-            Option::None => Result::Ok(unsafe { self.make_move_unchecked(color, position) }),
+            Option::None => Result::Ok(unsafe { self.make_move_unchecked(player, position) }),
             Option::Some(_) => Result::Err(BoardMakeMoveIllegallyError {
-                color,
+                color: player,
                 position,
             }),
         }
@@ -537,53 +538,41 @@ impl Board {
     ///
     /// # Safety
     /// There be must no disk at the position.
-    pub const unsafe fn make_move_unchecked(self, color: Color, position: Position) -> Self {
-        let reversed = self.reversed_disks(color, position);
+    pub const unsafe fn make_move_unchecked(self, player: Player, position: Position) -> Self {
+        match player {
+            Player::Black => {
+                let reversed = self.reversed_disks(Player::Black, position);
 
-        let player = self
-            .disks(color)
-            .xor(Bits::of(0).set(position, true))
-            .xor(reversed);
-
-        let opponent = self.disks(color.flip()).xor(reversed);
-
-        match color {
-            Color::Black => Self::new_unchecked(player, opponent),
-            Color::White => Self::new_unchecked(opponent, player),
+                Self::new_unchecked(
+                    self.black
+                        .xor(Bools::repeat(false).set(position, true))
+                        .xor(reversed),
+                    self.white.xor(reversed),
+                )
+            },
+            Player::White => self
+                .swap_disks()
+                .make_move_unchecked(Player::Black, position)
+                .swap_disks(),
         }
     }
 
-    /// Tests if the game is finished.
-    pub const fn is_finished(self) -> bool {
-        self.legal_moves(Color::Black).any() | self.legal_moves(Color::White).any()
+    /// Tests if the game is ongoing.
+    pub const fn is_ongoing(self) -> bool {
+        !self.legal_moves(Player::Black).all(false) | !self.legal_moves(Player::White).all(false)
     }
 
-    /// Gets the "now" result of a player.
-    pub const fn result(self, color: Color) -> Option<ResultKind> {
-        let player = self.disks(color).count(true);
-        let opponent = self.disks(color.flip()).count(true);
+    /// Returns the current winner, or none when the result is draw.
+    pub const fn winner(self) -> Option<Player> {
+        let black = self.black.count(true);
+        let white = self.white.count(true);
 
-        if player > opponent {
-            Option::Some(ResultKind::Win)
-        } else if player < opponent {
-            Option::Some(ResultKind::Lose)
+        if black > white {
+            Option::Some(Player::Black)
+        } else if black < white {
+            Option::Some(Player::White)
         } else {
             Option::None
-        }
-    }
-
-    /// Gets a player who has the result now.
-    pub const fn who(self, result: ResultKind) -> Option<Color> {
-        match self.result(Color::Black) {
-            Option::Some(black_result) => match (result, black_result) {
-                (ResultKind::Win, ResultKind::Win) | (ResultKind::Lose, ResultKind::Lose) => {
-                    Option::Some(Color::Black)
-                },
-                (ResultKind::Win, ResultKind::Lose) | (ResultKind::Lose, ResultKind::Win) => {
-                    Option::Some(Color::White)
-                },
-            },
-            Option::None => Option::None,
         }
     }
 }
@@ -591,21 +580,21 @@ impl Board {
 /// An error returned by [`Board::new`]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BoardNewError {
-    black: Bits,
-    white: Bits,
+    black: Bools,
+    white: Bools,
 }
 
 /// An error returned by [`Board::make_move`]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BoardMakeMoveError {
-    color: Color,
+    color: Player,
     position: Position,
 }
 
 /// An error returned by [`Board::make_move_illegally`]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BoardMakeMoveIllegallyError {
-    color: Color,
+    color: Player,
     position: Position,
 }
 
@@ -613,15 +602,15 @@ pub struct BoardMakeMoveIllegallyError {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Game {
     board: Board,
-    next: Color,
+    next: Player,
 }
 
 impl Game {
     /// The standard game.
-    pub const STANDARD: Self = Self::new(Board::STANDARD, Color::Black);
+    pub const STANDARD: Self = Self::new(Board::STANDARD, Player::Black);
 
     /// Gets a new game.
-    pub const fn new(board: Board, next: Color) -> Self {
+    pub const fn new(board: Board, next: Player) -> Self {
         Self {
             board,
             next,
@@ -634,17 +623,17 @@ impl Game {
     }
 
     /// Gets the next player.
-    pub const fn next(self) -> Color {
+    pub const fn next(self) -> Player {
         self.next
     }
 
     /// Calculates legal moves.
-    pub const fn legal_moves(self) -> Bits {
+    pub const fn legal_moves(self) -> Bools {
         self.board.legal_moves(self.next)
     }
 
     /// Calculates disks which will be reversed.
-    pub const fn reversed_disks(self, position: Position) -> Bits {
+    pub const fn reversed_disks(self, position: Position) -> Bools {
         self.board.reversed_disks(self.next, position)
     }
 
@@ -654,7 +643,7 @@ impl Game {
     /// See [`Board::make_move`].
     pub const fn make_move(self, position: Position) -> Result<Self, BoardMakeMoveError> {
         match self.board.make_move(self.next, position) {
-            Result::Ok(board) => Result::Ok(Self::new(board, self.next.flip())),
+            Result::Ok(board) => Result::Ok(Self::new(board, self.next.opponent())),
             Result::Err(error) => Result::Err(error),
         }
     }
@@ -668,7 +657,7 @@ impl Game {
         position: Position,
     ) -> Result<Self, BoardMakeMoveIllegallyError> {
         match self.board.make_move_illegally(self.next, position) {
-            Result::Ok(board) => Result::Ok(Self::new(board, self.next.flip())),
+            Result::Ok(board) => Result::Ok(Self::new(board, self.next.opponent())),
             Result::Err(error) => Result::Err(error),
         }
     }
@@ -680,12 +669,12 @@ impl Game {
     pub const unsafe fn make_move_unchecked(self, position: Position) -> Self {
         Self::new(
             self.board.make_move_unchecked(self.next, position),
-            self.next.flip(),
+            self.next.opponent(),
         )
     }
 
-    /// Passes a turn.
-    pub const fn pass(self) -> Self {
-        Self::new(self.board, self.next.flip())
+    /// Passes the turn.
+    pub const fn pass_turn(self) -> Self {
+        Self::new(self.board, self.next.opponent())
     }
 }
