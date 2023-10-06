@@ -32,15 +32,11 @@ pub struct Position {
 
 impl Position {
     /// Gets a position from a raw value.
-    ///
-    /// # Errors
-    /// This function will return an error if `raw` is greater than or equal to `64`.
-    pub const fn new(raw: u8) -> Result<Self, PositionNewError> {
+    /// This function will return [`Option::None`] if `raw` is greater than or equal to `64`.
+    pub const fn new(raw: u8) -> Option<Self> {
         match raw < 64 {
-            true => Result::Ok(unsafe { Self::new_unchecked(raw) }),
-            false => Result::Err(PositionNewError {
-                raw,
-            }),
+            true => Option::Some(unsafe { Self::new_unchecked(raw) }),
+            false => Option::None,
         }
     }
 
@@ -55,16 +51,11 @@ impl Position {
     }
 
     /// Gets a position from a row and a column.
-    ///
-    /// # Errors
-    /// This function will return an error if `row` or `column` is greater than or equal to `8`.
-    pub const fn at(row: u8, column: u8) -> Result<Self, PositionAtError> {
+    /// This function will return [`Option::None`] if `row` or `column` is greater than or equal to `8`.
+    pub const fn at(row: u8, column: u8) -> Option<Self> {
         match (row < 8, column < 8) {
-            (true, true) => Result::Ok(unsafe { Self::at_unchecked(row, column) }),
-            _ => Result::Err(PositionAtError {
-                row,
-                column,
-            }),
+            (true, true) => Option::Some(unsafe { Self::at_unchecked(row, column) }),
+            _ => Option::None,
         }
     }
 
@@ -95,19 +86,6 @@ impl Position {
     pub fn iter() -> impl Iterator<Item = Self> {
         (0..64).map(|position| unsafe { Self::new_unchecked(position) })
     }
-}
-
-/// An error returned by [`Position::new`]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct PositionNewError {
-    raw: u8,
-}
-
-/// An error returned by [`Position::at`]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct PositionAtError {
-    row: u8,
-    column: u8,
 }
 
 /// 8x8 boolean values.
@@ -388,16 +366,11 @@ impl Board {
     };
 
     /// Gets a new board.
-    ///
-    /// Errors
-    /// This function will return an error if there is any position which the boolean values of `black` and `white` are true.
-    pub const fn new(black: Bools, white: Bools) -> Result<Self, BoardNewError> {
+    /// This function will return [`Option::None`] if there is any position which the boolean values of `black` and `white` are true.
+    pub const fn new(black: Bools, white: Bools) -> Option<Self> {
         match Bools::and(black, white).all(false) {
-            true => Result::Ok(unsafe { Self::new_unchecked(black, white) }),
-            false => Result::Err(BoardNewError {
-                black,
-                white,
-            }),
+            true => Option::Some(unsafe { Self::new_unchecked(black, white) }),
+            false => Option::None,
         }
     }
 
@@ -499,38 +472,20 @@ impl Board {
     }
 
     /// Makes a move.
-    ///
-    /// # Errors
-    /// This function will return an error if the move is illegal.
-    pub const fn make_move(
-        self,
-        player: Player,
-        position: Position,
-    ) -> Result<Self, BoardMakeMoveError> {
+    /// This function will return [`Option::None`] if the move is illegal.
+    pub const fn make_move(self, player: Player, position: Position) -> Option<Self> {
         match self.legal_moves(player).get(position) {
-            true => Result::Ok(unsafe { self.make_move_unchecked(player, position) }),
-            false => Result::Err(BoardMakeMoveError {
-                color: player,
-                position,
-            }),
+            true => Option::Some(unsafe { self.make_move_unchecked(player, position) }),
+            false => Option::None,
         }
     }
 
     /// Makes a move.
-    ///
-    /// # Errors
-    /// This function will return an error if there is a disk at the position.
-    pub const fn make_move_illegally(
-        self,
-        player: Player,
-        position: Position,
-    ) -> Result<Self, BoardMakeMoveIllegallyError> {
+    /// This function will return [`Option::None`] if there is a disk at the position.
+    pub const fn make_move_illegally(self, player: Player, position: Position) -> Option<Self> {
         match self.get(position) {
-            Option::None => Result::Ok(unsafe { self.make_move_unchecked(player, position) }),
-            Option::Some(_) => Result::Err(BoardMakeMoveIllegallyError {
-                color: player,
-                position,
-            }),
+            Option::None => Option::Some(unsafe { self.make_move_unchecked(player, position) }),
+            Option::Some(_) => Option::None,
         }
     }
 
@@ -577,27 +532,6 @@ impl Board {
     }
 }
 
-/// An error returned by [`Board::new`]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct BoardNewError {
-    black: Bools,
-    white: Bools,
-}
-
-/// An error returned by [`Board::make_move`]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct BoardMakeMoveError {
-    color: Player,
-    position: Position,
-}
-
-/// An error returned by [`Board::make_move_illegally`]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct BoardMakeMoveIllegallyError {
-    color: Player,
-    position: Position,
-}
-
 /// A game.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Game {
@@ -638,27 +572,20 @@ impl Game {
     }
 
     /// Make a move.
-    ///
-    /// # Errors
     /// See [`Board::make_move`].
-    pub const fn make_move(self, position: Position) -> Result<Self, BoardMakeMoveError> {
+    pub const fn make_move(self, position: Position) -> Option<Self> {
         match self.board.make_move(self.next, position) {
-            Result::Ok(board) => Result::Ok(Self::new(board, self.next.opponent())),
-            Result::Err(error) => Result::Err(error),
+            Option::Some(board) => Option::Some(Self::new(board, self.next.opponent())),
+            Option::None => Option::None,
         }
     }
 
     /// Make a move.
-    ///
-    /// # Errors
     /// See [`Board::make_move_illegally`]
-    pub const fn make_move_illegally(
-        self,
-        position: Position,
-    ) -> Result<Self, BoardMakeMoveIllegallyError> {
+    pub const fn make_move_illegally(self, position: Position) -> Option<Self> {
         match self.board.make_move_illegally(self.next, position) {
-            Result::Ok(board) => Result::Ok(Self::new(board, self.next.opponent())),
-            Result::Err(error) => Result::Err(error),
+            Option::Some(board) => Option::Some(Self::new(board, self.next.opponent())),
+            Option::None => Option::None,
         }
     }
 
