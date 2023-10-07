@@ -512,11 +512,6 @@ impl Board {
         }
     }
 
-    /// Tests if the game is ongoing.
-    pub const fn is_ongoing(self) -> bool {
-        !self.legal_moves(Player::Black).all(false) | !self.legal_moves(Player::White).all(false)
-    }
-
     /// Returns the current winner, or none when the result is draw.
     pub const fn winner(self) -> Option<Player> {
         let black = self.black.count(true);
@@ -541,10 +536,22 @@ pub struct Game {
 
 impl Game {
     /// The standard game.
-    pub const STANDARD: Self = Self::new(Board::STANDARD, Player::Black);
+    pub const STANDARD: Self = unsafe { Self::new_unchecked(Board::STANDARD, Player::Black) };
 
     /// Gets a new game.
-    pub const fn new(board: Board, next: Player) -> Self {
+    /// This function will return [`Option::None`] if there is no legal move.
+    pub const fn new(board: Board, next: Player) -> Option<Self> {
+        match !board.legal_moves(next).all(false) {
+            true => Option::Some(unsafe { Self::new_unchecked(board, next) }),
+            false => Option::None,
+        }
+    }
+
+    /// Gets a new game.
+    ///
+    /// # Safety
+    /// There must be any legal move.
+    pub const unsafe fn new_unchecked(board: Board, next: Player) -> Self {
         Self {
             board,
             next,
@@ -573,18 +580,18 @@ impl Game {
 
     /// Make a move.
     /// See [`Board::make_move`].
-    pub const fn make_move(self, position: Position) -> Option<Self> {
+    pub const fn make_move(self, position: Position) -> Option<MakeMoveResult> {
         match self.board.make_move(self.next, position) {
-            Option::Some(board) => Option::Some(Self::new(board, self.next.opponent())),
+            Option::Some(board) => Option::Some(MakeMoveResult::new(board, self.next)),
             Option::None => Option::None,
         }
     }
 
     /// Make a move.
     /// See [`Board::make_move_illegally`]
-    pub const fn make_move_illegally(self, position: Position) -> Option<Self> {
+    pub const fn make_move_illegally(self, position: Position) -> Option<MakeMoveResult> {
         match self.board.make_move_illegally(self.next, position) {
-            Option::Some(board) => Option::Some(Self::new(board, self.next.opponent())),
+            Option::Some(board) => Option::Some(MakeMoveResult::new(board, self.next)),
             Option::None => Option::None,
         }
     }
@@ -593,15 +600,35 @@ impl Game {
     ///
     /// # Safety
     /// See [`Board::make_move_unchecked`].
-    pub const unsafe fn make_move_unchecked(self, position: Position) -> Self {
-        Self::new(
+    pub const unsafe fn make_move_unchecked(self, position: Position) -> MakeMoveResult {
+        MakeMoveResult::new(
             self.board.make_move_unchecked(self.next, position),
-            self.next.opponent(),
+            self.next,
         )
     }
 
     /// Passes the turn.
-    pub const fn pass_turn(self) -> Self {
+    pub const fn pass_turn(self) -> Option<Self> {
         Self::new(self.board, self.next.opponent())
+    }
+}
+
+/// A result of making a move.
+pub enum MakeMoveResult {
+    /// The game is ongoing.
+    Ongoing(Game),
+    /// The game has been finished.
+    Finished(Board),
+}
+
+impl MakeMoveResult {
+    const fn new(board: Board, now: Player) -> Self {
+        match Game::new(board, now.opponent()) {
+            Option::Some(game) => Self::Ongoing(game),
+            Option::None => match Game::new(board, now) {
+                Option::Some(game) => Self::Ongoing(game),
+                Option::None => Self::Finished(board),
+            },
+        }
     }
 }
