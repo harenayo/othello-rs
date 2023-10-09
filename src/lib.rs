@@ -2,6 +2,8 @@
 
 #![no_std]
 
+use core::ops::ControlFlow;
+
 /// A position on a board.
 ///
 /// ```txt
@@ -472,20 +474,11 @@ impl Board {
     }
 
     /// Makes a move.
-    /// This function will return [`Option::None`] if the move is illegal.
+    /// This function will return [`Option::None`] if the move is not [legal](Self::legal_moves).
     pub const fn make_move(self, player: Player, position: Position) -> Option<Self> {
         match self.legal_moves(player).get(position) {
             true => Option::Some(unsafe { self.make_move_unchecked(player, position) }),
             false => Option::None,
-        }
-    }
-
-    /// Makes a move.
-    /// This function will return [`Option::None`] if there is a disk at the position.
-    pub const fn make_move_illegally(self, player: Player, position: Position) -> Option<Self> {
-        match self.get(position) {
-            Option::None => Option::Some(unsafe { self.make_move_unchecked(player, position) }),
-            Option::Some(_) => Option::None,
         }
     }
 
@@ -512,7 +505,7 @@ impl Board {
         }
     }
 
-    /// Returns the current winner, or none when the result is draw.
+    /// Returns the current winner, or [`Option::None`] when the result is draw.
     pub const fn winner(self) -> Option<Player> {
         let black = self.black.count(true);
         let white = self.white.count(true);
@@ -531,7 +524,7 @@ impl Board {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Game {
     board: Board,
-    next: Player,
+    player: Player,
 }
 
 impl Game {
@@ -540,9 +533,9 @@ impl Game {
 
     /// Gets a new game.
     /// This function will return [`Option::None`] if there is no legal move.
-    pub const fn new(board: Board, next: Player) -> Option<Self> {
-        match !board.legal_moves(next).all(false) {
-            true => Option::Some(unsafe { Self::new_unchecked(board, next) }),
+    pub const fn new(board: Board, player: Player) -> Option<Self> {
+        match !board.legal_moves(player).all(false) {
+            true => Option::Some(unsafe { Self::new_unchecked(board, player) }),
             false => Option::None,
         }
     }
@@ -551,10 +544,10 @@ impl Game {
     ///
     /// # Safety
     /// There must be any legal move.
-    pub const unsafe fn new_unchecked(board: Board, next: Player) -> Self {
+    pub const unsafe fn new_unchecked(board: Board, player: Player) -> Self {
         Self {
             board,
-            next,
+            player,
         }
     }
 
@@ -563,72 +556,50 @@ impl Game {
         self.board
     }
 
-    /// Gets the next player.
-    pub const fn next(self) -> Player {
-        self.next
+    /// Gets the player.
+    pub const fn player(self) -> Player {
+        self.player
     }
 
     /// Calculates legal moves.
     pub const fn legal_moves(self) -> Bools {
-        self.board.legal_moves(self.next)
+        self.board.legal_moves(self.player)
     }
 
     /// Calculates disks which will be reversed.
     pub const fn reversed_disks(self, position: Position) -> Bools {
-        self.board.reversed_disks(self.next, position)
+        self.board.reversed_disks(self.player, position)
     }
 
-    /// Make a move.
+    /// Makes a move.
+    /// This function will return [`ControlFlow::Continue`] if the game is ongoing, and return [`ControlFlow::Break`] if the game has ended, or return [`Option::None`] if the move is not [legal](Self::legal_moves).
     /// See [`Board::make_move`].
-    pub const fn make_move(self, position: Position) -> Option<MakeMoveResult> {
-        match self.board.make_move(self.next, position) {
-            Option::Some(board) => Option::Some(MakeMoveResult::new(board, self.next)),
-            Option::None => Option::None,
+    pub const fn make_move(self, position: Position) -> Option<ControlFlow<Board, Self>> {
+        match self.legal_moves().get(position) {
+            true => Option::Some(unsafe { self.make_move_unchecked(position) }),
+            false => Option::None,
         }
     }
 
-    /// Make a move.
-    /// See [`Board::make_move_illegally`]
-    pub const fn make_move_illegally(self, position: Position) -> Option<MakeMoveResult> {
-        match self.board.make_move_illegally(self.next, position) {
-            Option::Some(board) => Option::Some(MakeMoveResult::new(board, self.next)),
-            Option::None => Option::None,
-        }
-    }
-
-    /// Make a move.
+    /// Makes a move.
+    /// This function will return [`ControlFlow::Continue`] if the game is ongoing, and return [`ControlFlow::Break`] if the game has ended.
     ///
     /// # Safety
-    /// See [`Board::make_move_unchecked`].
-    pub const unsafe fn make_move_unchecked(self, position: Position) -> MakeMoveResult {
-        MakeMoveResult::new(
-            self.board.make_move_unchecked(self.next, position),
-            self.next,
-        )
+    /// There be must no disk at the position.
+    pub const unsafe fn make_move_unchecked(self, position: Position) -> ControlFlow<Board, Self> {
+        let board = self.board.make_move_unchecked(self.player, position);
+
+        match Game::new(board, self.player.opponent()) {
+            Option::Some(game) => ControlFlow::Continue(game),
+            Option::None => match Game::new(board, self.player) {
+                Option::Some(game) => ControlFlow::Continue(game),
+                Option::None => ControlFlow::Break(board),
+            },
+        }
     }
 
     /// Passes the turn.
     pub const fn pass_turn(self) -> Option<Self> {
-        Self::new(self.board, self.next.opponent())
-    }
-}
-
-/// A result of making a move.
-pub enum MakeMoveResult {
-    /// The game is ongoing.
-    Ongoing(Game),
-    /// The game has been finished.
-    Finished(Board),
-}
-
-impl MakeMoveResult {
-    const fn new(board: Board, now: Player) -> Self {
-        match Game::new(board, now.opponent()) {
-            Option::Some(game) => Self::Ongoing(game),
-            Option::None => match Game::new(board, now) {
-                Option::Some(game) => Self::Ongoing(game),
-                Option::None => Self::Finished(board),
-            },
-        }
+        Self::new(self.board, self.player.opponent())
     }
 }
